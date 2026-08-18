@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+.env/
+conda-env/
+
+# Data
+data/
+*.h5
+*.hdf5
+*.zip
+*.tar
+*.tar.gz
+
+# Training outputs
+results/
+logs/
+lightning_logs/
+wandb/
+*.ckpt
+*.npz
+*.pkl
+
+# Mac
+.DS_Store

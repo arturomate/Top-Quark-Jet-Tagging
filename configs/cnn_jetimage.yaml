@@ -1,0 +1,108 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Experiment: CNN on Jet Images
+#
+# Each jet is pixelised in the (Δη, Δφ) plane (centred on the calibrated jet
+# axis) into a 40×40 image.  Pixel intensity is the constituent pT normalised
+# by the jet scalar-sum pT.  A small ConvNet learns local substructure patterns.
+#
+# Usage:
+#   python scripts/train.py    --config configs/cnn_jetimage.yaml
+#   python scripts/evaluate.py --config configs/cnn_jetimage.yaml \
+#                              --checkpoint results/cnn_jetimage_baseline/checkpoints/best.ckpt
+#
+# Scientific context:
+#   High-level MLP   → expert-engineered features (15 variables)
+#   Flattened MLP    → raw constituent info, no inductive bias
+#   CNN (this file)  → spatial image, local substructure patterns via convolutions
+#   GNN / Transformer → full point-cloud, permutation-invariant (future work)
+# ──────────────────────────────────────────────────────────────────────────────
+
+experiment:
+  name: cnn_jetimage_baseline
+  seed: 42
+
+# ── Data ───────────────────────────────────────────────────────────────────────
+data:
+  path: data/raw/train_nominal_000.h5
+  input_type: jet_image         # triggers jet-image loading path in DataModule
+
+  validation_fraction: 0.20
+  batch_size: 256               # images are larger than HL feature vectors
+  num_workers: 0
+  pin_memory: auto
+
+  # StandardScaler is not applied to image tensors.
+  # Setting this to true will raise a ValueError; keep it false.
+  standardize: false
+
+  # ── Jet-image parameters ──────────────────────────────────────────────────
+  image:
+    image_size:      40         # pixels per side; image is (1, 40, 40)
+    image_range:     1.0        # Δη and Δφ both span [-1.0, +1.0]
+    max_constituents: 200       # use all valid constituents (pT > 0)
+    center:          jet_axis   # centre on the calibrated jet η/φ axis
+    rotation:        none       # no additional rotation (configurable later)
+    normalize:       sum_pt     # pixel = pT_i / Σ pT_jet  (per-jet)
+    log_scale:       false      # apply log1p to pixel intensities
+
+  # HDF5 branch names for constituent kinematics.
+  constituent_branches:
+    pt:  fjet_clus_pt
+    eta: fjet_clus_eta
+    phi: fjet_clus_phi
+
+  # HDF5 branch names for the calibrated jet axis.
+  jet_branches:
+    eta: fjet_eta
+    phi: fjet_phi
+
+  label_branch:   labels
+  weight_branch:  training_weights
+  jet_pt_branch:  fjet_pt       # loaded in MeV; converted to GeV only in evaluation
+
+# ── Model ──────────────────────────────────────────────────────────────────────
+model:
+  name:             cnn_jetimage   # registered in src/models/mlp.py build_model
+  input_channels:   1
+  image_size:       40
+  conv_channels:    [16, 32, 64]
+  kernel_size:      3
+  dropout:          0.20
+  use_batchnorm:    true
+  dense_hidden_dims: [128, 64]
+
+# ── Optimiser ──────────────────────────────────────────────────────────────────
+optimizer:
+  name:         adam
+  lr:           0.001
+  weight_decay: 0.0001
+
+# ── LR scheduler ───────────────────────────────────────────────────────────────
+scheduler:
+  name:    reduce_on_plateau
+  factor:  0.5
+  patience: 3
+  monitor: val_loss
+
+# ── Trainer ────────────────────────────────────────────────────────────────────
+trainer:
+  max_epochs:               50
+  accelerator:              cpu
+  devices:                  1
+  deterministic:            true
+  early_stopping_patience:  7
+  num_sanity_val_steps:     0
+
+# ── Evaluation ─────────────────────────────────────────────────────────────────
+evaluation:
+  threshold:            0.5
+  signal_efficiencies:  [0.5, 0.8]
+  compute_pt_binned:    true
+  pt_bins_gev:
+    [350, 550, 750, 950, 1150, 1350, 1550, 1750, 1950, 2150,
+     2350, 2550, 2750, 2950, 3150]
+
+# ── Output directories (relative to project root) ─────────────────────────────
+outputs:
+  root_dir:   results
+  figure_dir: figures

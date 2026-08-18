@@ -1,0 +1,263 @@
+GUÍA RÁPIDA — YAML FILES EN NUESTRO PROYECTO DE TOP TAGGING
+================================================================
+
+1. ¿Qué es una YAML file?
+-------------------------
+Una YAML file es un archivo de configuración. En nuestro proyecto, sirve para
+decirle al código qué experimento queremos ejecutar, sin tener que modificar
+directamente los archivos Python.
+
+Por ejemplo, en vez de abrir train.py y cambiar a mano el learning rate, el batch
+size, el número de épocas o el tipo de modelo, escribimos esos valores en:
+
+    configs/mlp_highlevel.yaml
+
+El código Python lee esa configuración y entrena el modelo siguiendo esas
+instrucciones.
+
+
+2. ¿Por qué usamos una YAML file?
+---------------------------------
+La usamos porque hace que el proyecto sea:
+
+- Más ordenado: el código está separado de los hiperparámetros.
+- Más reproducible: queda guardado exactamente qué configuración produjo cada resultado.
+- Más fácil de comparar: podemos entrenar modelos distintos cambiando solo la YAML.
+- Más profesional: encaja con lo que pide el proyecto, es decir, ejecutar experimentos
+  con una sola línea de comando.
+- Más escalable: más adelante podremos usar la misma estructura en Snellius.
+
+
+3. ¿Qué contiene nuestra YAML file?
+-----------------------------------
+Nuestra primera YAML será algo como:
+
+    configs/mlp_highlevel.yaml
+
+y contendrá información como:
+
+- Nombre del experimento.
+- Semilla aleatoria.
+- Ruta del dataset.
+- Qué variables usar como input.
+- Batch size.
+- Número de épocas.
+- Learning rate.
+- Arquitectura del MLP.
+- Dropout.
+- Uso de BatchNorm.
+- Optimizer.
+- Scheduler.
+- Métricas que queremos calcular.
+- Carpetas donde guardar resultados y figuras.
+
+En otras palabras, la YAML describe el experimento.
+
+
+4. ¿Dónde se ejecuta?
+---------------------
+Todo esto se ejecuta desde la terminal, estando en la raíz del proyecto.
+
+Primero vamos a la carpeta del proyecto:
+
+    cd ~/Desktop/ML_TopTagging_Project
+
+Activamos el entorno virtual:
+
+    source .venv/bin/activate
+
+Y ejecutamos el entrenamiento con:
+
+    python scripts/train.py --config configs/mlp_highlevel.yaml
+
+Esto significa:
+
+- Ejecuta el script scripts/train.py.
+- Usa como instrucciones la configuración configs/mlp_highlevel.yaml.
+
+
+5. ¿Qué hace train.py?
+----------------------
+train.py es el script que entrena el modelo. En nuestro caso hará algo como:
+
+1. Leer la YAML file.
+2. Cargar data/raw/train_nominal_000.h5.
+3. Seleccionar las 15 high-level features.
+4. Cargar labels y training_weights.
+5. Hacer train/validation split.
+6. Normalizar las features usando solo el training set.
+7. Crear DataLoaders.
+8. Construir el MLP.
+9. Entrenar con PyTorch Lightning.
+10. Usar weighted BCE loss.
+11. Guardar el mejor checkpoint.
+12. Guardar logs y resultados en results/.
+
+
+6. ¿Qué esperamos obtener después de entrenar?
+----------------------------------------------
+Después de ejecutar train.py, esperamos que aparezca una carpeta parecida a:
+
+    results/mlp_highlevel_baseline/
+
+Dentro deberíamos encontrar cosas como:
+
+- Checkpoints del modelo entrenado.
+- Copia de la configuración usada.
+- Logs del entrenamiento.
+- Posibles curvas de loss.
+
+Para encontrar el checkpoint podemos usar:
+
+    find results -name "*.ckpt"
+
+
+7. ¿Cómo evaluamos el modelo?
+-----------------------------
+Una vez tenemos un checkpoint, ejecutamos:
+
+    python scripts/evaluate.py --config configs/mlp_highlevel.yaml --checkpoint RUTA_DEL_CHECKPOINT
+
+Por ejemplo:
+
+    python scripts/evaluate.py --config configs/mlp_highlevel.yaml --checkpoint results/mlp_highlevel_baseline/checkpoints/best.ckpt
+
+evaluate.py debería:
+
+1. Cargar la misma YAML.
+2. Reconstruir el modelo.
+3. Cargar los pesos entrenados desde el checkpoint.
+4. Hacer predicciones sobre la validation split.
+5. Calcular métricas.
+6. Guardar plots y archivos de resultados.
+
+
+8. ¿Qué esperamos obtener después de evaluar?
+----------------------------------------------
+Después de evaluate.py esperamos obtener:
+
+- Accuracy.
+- Weighted accuracy.
+- ROC AUC.
+- Weighted ROC AUC.
+- Background rejection en epsilon_S = 0.5.
+- Background rejection en epsilon_S = 0.8.
+- ROC curve.
+- Score distributions.
+- Confusion matrix.
+- Archivo .json con métricas.
+- Archivo .npz con predicciones.
+
+Los resultados deberían ser parecidos a los del Notebook 02, aproximadamente:
+
+    Accuracy ~ 0.85
+    ROC AUC ~ 0.93
+    Background rejection at epsilon_S = 0.5 ~ 30-35
+    Background rejection at epsilon_S = 0.8 ~ 8-10
+
+No tienen que ser exactamente idénticos, pero sí razonablemente cercanos.
+
+
+9. ¿Cómo cambio algo del experimento?
+-------------------------------------
+La ventaja de la YAML es que podemos cambiar el experimento sin tocar el código.
+
+Ejemplo 1: cambiar el learning rate
+
+En configs/mlp_highlevel.yaml:
+
+    optimizer:
+      lr: 0.001
+
+Lo podríamos cambiar a:
+
+    optimizer:
+      lr: 0.0005
+
+Luego volvemos a correr:
+
+    python scripts/train.py --config configs/mlp_highlevel.yaml
+
+
+Ejemplo 2: cambiar el tamaño del modelo
+
+Podemos cambiar:
+
+    model:
+      hidden_dims: [128, 64, 32]
+
+por:
+
+    model:
+      hidden_dims: [256, 128, 64]
+
+Eso entrena un MLP más grande.
+
+
+Ejemplo 3: cambiar el batch size
+
+Podemos cambiar:
+
+    data:
+      batch_size: 1024
+
+por:
+
+    data:
+      batch_size: 512
+
+Eso cambia cuántos jets procesa el modelo en cada batch.
+
+
+10. ¿Cómo compararemos modelos más adelante?
+---------------------------------------------
+Más adelante tendremos otra config, por ejemplo:
+
+    configs/mlp_constituents.yaml
+
+Entonces podremos entrenar otro modelo con:
+
+    python scripts/train.py --config configs/mlp_constituents.yaml
+
+La idea será comparar:
+
+- mlp_highlevel.yaml
+- mlp_constituents.yaml
+- futuras configs para CNN, GNN o Transformer
+
+usando siempre las mismas métricas:
+
+- Accuracy.
+- AUC.
+- Background rejection at fixed signal efficiency.
+- Score distributions.
+- ROC curves.
+
+
+11. ¿Por qué no seguimos solo con notebooks?
+---------------------------------------------
+Los notebooks son muy buenos para explorar, explicar y prototipar. Por eso hicimos:
+
+    notebooks/01_data_exploration.ipynb
+    notebooks/02_mlp_baseline_high_level.ipynb
+
+Pero para un proyecto serio necesitamos algo más reproducible. El framework con YAML,
+train.py y evaluate.py permite:
+
+- Repetir experimentos fácilmente.
+- Comparar modelos de forma justa.
+- Evitar copiar y pegar celdas.
+- Guardar resultados ordenadamente.
+- Escalar más adelante a Snellius.
+- Cumplir exactamente el punto 2 del enunciado del proyecto.
+
+La idea no es sustituir los notebooks, sino complementar:
+
+- Notebooks: explicación, exploración y análisis.
+- Scripts + YAML: entrenamiento y evaluación reproducibles.
+
+
+SegundoModelo: MLP Constituents
+python scripts/train.py --config configs/mlp_constituents.yaml
+find results -name "*.ckpt" | sort
+python scripts/evaluate.py --config configs/mlp_constituents.yaml --checkpoint RUTA_DEL_CHECKPOINT_CONSTITUENTS
