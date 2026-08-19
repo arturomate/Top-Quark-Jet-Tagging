@@ -224,13 +224,7 @@ Each run records the random seed, architecture, optimiser, scheduler, preprocess
 
 ## Presentation
 
-The project is accompanied by an interactive **HTML presentation** covering the physics motivation, dataset, representations, architectures, training strategy and results.
-
-It will live under:
-
-```text
-presentation/
-```
+The project is accompanied by an interactive [**HTML presentation**](https://github.com/arturomate/Top-Quark-Jet-Tagging/tree/master/presentation) covering the physics motivation, dataset, representations, architectures, training strategy and results. I recommend you to check it out!
 
 ---
 
